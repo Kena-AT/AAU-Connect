@@ -6,10 +6,10 @@ export const verifiedStudentGuard: CanActivateFn = (route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (auth.isVerified()) {
+  if (auth.isAuthenticated() && auth.isVerified()) {
     return true;
   }
 
-  // Redirect to verification or onboarding
-  return router.createUrlTree(['/verification']);
+  // Redirect to login if not authenticated or verified
+  return router.createUrlTree(['/login']);
 };

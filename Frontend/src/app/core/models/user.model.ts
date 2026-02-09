@@ -1,10 +1,13 @@
 export type UserRole = 'student' | 'cr' | 'admin' | 'moderator';
+// Updated for AAU Connect UI Refinement
 
 export interface User {
-  id: string;
+  _id: string;
   email: string;
   firstName: string;
   lastName: string;
+  initials: string;
+  gradient?: string;
   studentId?: string;
   role: UserRole;
   isVerified: boolean;

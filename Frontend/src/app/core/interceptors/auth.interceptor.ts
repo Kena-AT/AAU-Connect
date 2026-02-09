@@ -12,15 +12,21 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // Actually, we can inject it if we are careful or use a lightweight token store.
   // But for HttpOnly cookies, we just need to ensure credentials are sent.
 
-  const authReq = req.clone({
-    withCredentials: true
-  });
+  const token = localStorage.getItem('aau_connect_token');
+
+  let authReq = req;
+  if (token) {
+    authReq = req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+  }
 
   return next(authReq).pipe(
     catchError((error: HttpErrorResponse) => {
       if (error.status === 401) {
-        // Simple redirect for now, sophisticated logic (refresh) can be added later
-        // or handled by a separate AuthService method that we inject lazily if needed.
+        localStorage.removeItem('aau_connect_token');
         router.navigate(['/login']);
       }
       return throwError(() => error);

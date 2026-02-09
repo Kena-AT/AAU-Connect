@@ -3,39 +3,13 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { LucideAngularModule, Heart, MessageCircle, Bookmark, Share2, MoreVertical, Plus, Edit, Image, Send } from 'lucide-angular';
 import { CreateStoryModalComponent } from '../../../shared/components/create-story-modal/create-story-modal.component';
 import { CreatePostModalComponent } from '../../../shared/components/create-post-modal/create-post-modal.component';
+import { User } from '../../../core/models/user.model';
 
-interface PostComment {
-  id: number;
-  author: string;
-  initials: string;
-  text: string;
-  timestamp: Date;
-}
-
-interface Post {
-  id: number;
-  author: {
-    name: string;
-    initials: string;
-    gradient: string;
-  };
-  course: string;
-  timeAgo: string;
-  title: string;
-  description: string;
-  image: string | null;
-  tags: string[];
-  likes: number;
-  comments: number;
-  isLiked: boolean;
-  isSaved: boolean;
-
-  // Optional/New properties
-  location?: string | null;
-  filters?: string | null;
-  showComments?: boolean;
-  commentsList?: PostComment[];
-}
+import { Post, PostComment, Story } from '../../../core/models/post.model';
+import { FeedApiService } from '../../../core/api/feed-api.service';
+import { AuthService } from '../../../core/auth/auth.service';
+import { UiStore } from '../../../core/state/ui.store';
+import { effect } from '@angular/core';
 
 @Component({
   selector: 'app-feed',
@@ -46,25 +20,31 @@ interface Post {
       <!-- Stories Bar -->
       <div class="stories-bar glass-card">
         <div class="stories-scroll">
-          <!-- Add Story Button -->
-          <div class="story-item add-story" (click)="storyModal.open()">
-            <div class="story-ring add-ring">
-              <div class="story-avatar add-avatar">
-                <lucide-icon [img]="PlusIcon" class="plus-icon"></lucide-icon>
+          <!-- Current User Story / Add Story -->
+          <div class="story-item user-story-wrapper" (click)="onUserStoryClick()">
+            <div class="story-ring" [class.active]="userHasStory()">
+              <div class="story-avatar user-avatar-main">
+                @if (userHasStory()) {
+                  <span class="initials">{{ auth.currentUser()?.initials }}</span>
+                } @else {
+                  <lucide-icon [img]="PlusIcon" class="plus-icon-small"></lucide-icon>
+                }
               </div>
             </div>
-            <span class="story-label">Add Story</span>
+            <span class="story-label">{{ userHasStory() ? 'Your Story' : 'Add Story' }}</span>
           </div>
 
-          @for (story of stories; track story.id) {
-            <div class="story-item">
-              <div class="story-ring" [class.active]="story.hasNew">
-                <div class="story-avatar gradient-text" [style.background]="story.gradient">
-                  {{ story.initials }}
+          @for (story of stories; track story._id) {
+            @if (story.author._id !== auth.currentUser()?._id) {
+              <div class="story-item" (click)="viewStory(story)">
+                <div class="story-ring active">
+                  <div class="story-avatar gradient-text" [style.background]="story.author.gradient">
+                    {{ story.author.initials }}
+                  </div>
                 </div>
+                <span class="story-label">{{ story.author.firstName }}</span>
               </div>
-              <span class="story-label">{{ story.label }}</span>
-            </div>
+            }
           }
         </div>
       </div>
@@ -82,27 +62,29 @@ interface Post {
         </div>
       }
 
-      <!-- Floating Action Button -->
-      <button class="fab" (click)="postModal.open()" title="Create Post">
-        <lucide-icon [img]="EditIcon" class="fab-icon"></lucide-icon>
-      </button>
-
-      <!-- Inline Create Post Card -->
-      <div class="create-post-card glass-card" (click)="postModal.open()">
-        <div class="current-user-avatar">
-          <span>YO</span>
+      <!-- Story Viewer Modal -->
+      @if (currentStoryView()) {
+        <div class="story-viewer-overlay" (click)="closeStoryViewer()">
+          <div class="story-viewer-container" (click)="$event.stopPropagation()">
+            <button class="story-close-btn" (click)="closeStoryViewer()">&times;</button>
+            <div class="story-viewer-header">
+              <div class="story-author-info">
+                <div class="story-author-avatar gradient-text" [style.background]="currentStoryView()!.author.gradient">
+                  {{ currentStoryView()!.author.initials }}
+                </div>
+                <span class="story-author-name">{{ currentStoryView()!.author.firstName }} {{ currentStoryView()!.author.lastName }}</span>
+              </div>
+            </div>
+            <div class="story-viewer-content">
+              <img [src]="currentStoryView()!.content" alt="Story" />
+            </div>
+          </div>
         </div>
-        <div class="fake-input">
-          Share a photo or video...
-        </div>
-        <button class="btn-icon">
-          <lucide-icon [img]="ImageIcon" class="icon"></lucide-icon>
-        </button>
-      </div>
+      }
 
       <!-- Academic Posts -->
       <div class="posts-feed">
-        @for (post of posts; track post.id) {
+        @for (post of posts; track post._id) {
           <article class="post-card glass-card card-3d">
             <!-- Post Header -->
             <div class="post-header">
@@ -111,9 +93,9 @@ interface Post {
                   {{ post.author.initials }}
                 </div>
                 <div class="author-info">
-                  <p class="author-name">{{ post.author.name }}</p>
+                  <p class="author-name">{{ post.author.firstName }} {{ post.author.lastName }}</p>
                   <span class="post-meta">
-                    {{ post.course }} • {{ post.timeAgo }}
+                    {{ post.course }} • {{ post.createdAt | date:'shortTime' }}
                     @if (post.location) { • {{ post.location }} }
                   </span>
                 </div>
@@ -128,8 +110,8 @@ interface Post {
               <h3 class="post-title">{{ post.title }}</h3>
               <p class="post-description">{{ post.description }}</p>
               @if (post.image) {
-                <div class="post-image-container blob" [style.filter]="post.filters || 'none'">
-                   <div class="post-image" [style.background]="post.image"></div>
+                <div class="post-image-container" [style.filter]="post.filters || 'none'">
+                  <img [src]="post.image" class="post-image" alt="Post content" />
                 </div>
               }
               @if (post.tags && post.tags.length > 0) {
@@ -144,20 +126,20 @@ interface Post {
             <!-- Post Actions -->
             <div class="post-actions">
               <button class="action-btn btn-interactive" 
-                [class.liked]="post.isLiked" 
+                [class.liked]="isLiked(post)" 
                 (click)="toggleLike(post)">
                 <lucide-icon [img]="HeartIcon" class="icon"></lucide-icon>
-                <span>{{ post.likes }}</span>
+                <span>{{ post.likes.length }}</span>
               </button>
               <button class="action-btn btn-interactive" (click)="toggleComments(post)">
                 <lucide-icon [img]="CommentIcon" class="icon"></lucide-icon>
-                <span>{{ post.comments }}</span>
+                <span>{{ post.commentsList?.length || 0 }}</span>
               </button>
               <button class="action-btn btn-interactive" 
-                [class.saved]="post.isSaved" 
+                [class.saved]="isSaved(post)" 
                 (click)="toggleSave(post)">
                 <lucide-icon [img]="BookmarkIcon" class="icon"></lucide-icon>
-                <span>{{ post.isSaved ? 'Saved' : 'Save' }}</span>
+                <span>{{ isSaved(post) ? 'Saved' : 'Save' }}</span>
               </button>
               <button class="action-btn btn-interactive" (click)="sharePost(post)">
                 <lucide-icon [img]="ShareIcon" class="icon"></lucide-icon>
@@ -170,7 +152,7 @@ interface Post {
               <div class="comments-section">
                 <div class="add-comment">
                   <div class="user-avatar-small">
-                    <span>YO</span>
+                    <span>{{ auth.currentUser()?.initials || 'YO' }}</span>
                   </div>
                   <input 
                     #commentInput
@@ -184,13 +166,13 @@ interface Post {
                 </div>
 
                 <div class="comments-list">
-                  @for (comment of post.commentsList; track comment.id) {
+                  @for (comment of post.commentsList; track comment._id) {
                     <div class="comment-item">
                       <div class="comment-avatar">
-                        {{ comment.initials }}
+                        {{ comment.author.initials }}
                       </div>
                       <div class="comment-content">
-                        <span class="comment-author">{{ comment.author }}</span>
+                        <span class="comment-author">{{ comment.author.firstName }} {{ comment.author.lastName }}</span>
                         <p class="comment-text">{{ comment.text }}</p>
                       </div>
                     </div>
@@ -209,6 +191,7 @@ interface Post {
       display: flex;
       flex-direction: column;
       gap: var(--space-2);
+      padding-top: var(--space-6);
     }
 
     /* Stories Bar */
@@ -251,73 +234,61 @@ interface Post {
     }
 
     .story-ring.active {
-      background: var(--gradient-neon);
+      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
       animation: pulse-ring 2s ease-in-out infinite;
-      box-shadow: var(--shadow-neon);
+      box-shadow: 0 0 15px rgba(220, 39, 67, 0.4);
     }
 
     @keyframes pulse-ring {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.9; }
     }
 
     .story-avatar {
-      width: 68px;
-      height: 68px;
+      width: 62px;
+      height: 62px;
       border-radius: var(--radius-full);
-      border: 4px solid var(--bg-card);
+      border: 3px solid var(--bg-app);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
-      font-size: var(--text-xl);
+      font-size: var(--text-lg);
       transition: transform var(--transition-base);
-      box-shadow: var(--shadow-lg);
+      background: var(--bg-card);
+      flex-shrink: 0;
+    }
+
+    .user-avatar-main {
+      background: var(--bg-glass);
+      border-color: var(--bg-app);
+      color: var(--text-primary);
+      position: relative;
+    }
+
+    .plus-icon-small {
+      width: 20px;
+      height: 20px;
+      color: var(--primary-500);
+    }
+
+    .user-story-wrapper:hover .story-avatar {
+      transform: scale(1.05);
     }
 
     .story-item:hover .story-avatar {
-      transform: scale(1.1) rotate(5deg);
+      transform: scale(1.05);
     }
 
     .story-label {
-      font-size: var(--text-xs);
+      font-size: 11px;
       color: var(--text-secondary);
       max-width: 74px;
       text-align: center;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      font-weight: 600;
-    }
-
-    /* Add Story Button */
-    .add-story {
-      opacity: 0.9;
-    }
-
-    .add-ring {
-      background: var(--bg-glass);
-      border: 2px dashed var(--border-glass);
-    }
-
-    .add-avatar {
-      background: var(--gradient-primary) !important;
-      cursor: pointer;
-    }
-
-    .plus-icon {
-      width: 32px;
-      height: 32px;
-      color: white;
-    }
-
-    .add-story:hover .add-ring {
-      border-color: var(--primary-500);
-      background: var(--bg-card);
-    }
-
-    .add-story:hover .add-avatar {
-      transform: scale(1.1) rotate(90deg);
+      font-weight: 500;
     }
 
     /* Posts Feed */
@@ -447,7 +418,7 @@ interface Post {
 
     .post-image-container {
       width: 100%;
-      height: 320px;
+      height: 450px;
       margin-bottom: var(--space-5);
       border-radius: var(--radius-2xl);
       overflow: hidden;
@@ -458,8 +429,7 @@ interface Post {
     .post-image {
       width: 100%;
       height: 100%;
-      background-size: cover;
-      background-position: center;
+      object-fit: cover;
     }
 
     .post-card:hover .post-image-container {
@@ -554,100 +524,8 @@ interface Post {
       fill: var(--primary-600);
     }
 
-    /* Floating Action Button */
-    .fab {
-      position: fixed;
-      bottom: var(--space-8);
-      right: var(--space-8);
-      width: 64px;
-      height: 64px;
-      background: var(--gradient-primary);
-      border: none;
-      border-radius: var(--radius-full);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      box-shadow: var(--shadow-2xl);
-      transition: all var(--transition-base);
-      z-index: 100;
-    }
-
-    .fab-icon {
-      width: 28px;
-      height: 28px;
-      color: white;
-    }
-
-    .fab:hover {
-      transform: scale(1.1) rotate(90deg);
-      box-shadow: 0 0 40px rgba(99, 102, 241, 0.6);
-    }
-
-    /* Create Post Card */
-    .create-post-card {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      padding: var(--space-4);
-      margin-bottom: var(--space-6);
-      cursor: text;
-      transition: all var(--transition-base);
-    }
-
-    .create-post-card:hover {
-      background: var(--bg-card);
-      transform: translateY(-2px);
-    }
-
-    .current-user-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: var(--radius-full);
-      background: var(--primary-600);
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: var(--text-sm);
-      flex-shrink: 0;
-    }
-
-    .fake-input {
-      flex: 1;
-      padding: var(--space-3);
-      background: var(--bg-glass);
-      border-radius: var(--radius-full);
-      color: var(--text-secondary);
-      font-size: var(--text-sm);
-      border: 1px solid transparent;
-      transition: all var(--transition-base);
-    }
-
-    .create-post-card:hover .fake-input {
-      background: var(--bg-app);
-      border-color: var(--border-color);
-    }
-
-    .btn-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: var(--radius-full);
-      border: none;
-      background: transparent;
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all var(--transition-base);
-    }
-
-    .btn-icon:hover {
-      background: var(--bg-glass);
-      color: var(--primary-600);
-    }
+    /* Post Creation removed to Sidebar */
+    /* Toast */
 
     @media (max-width: 768px) {
       .fab {
@@ -784,15 +662,140 @@ interface Post {
       90% { opacity: 1; transform: translate(-50%, 0); }
       100% { opacity: 0; transform: translate(-50%, -20px); }
     }
+
+    /* Story Viewer Modal */
+    .story-viewer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.95);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .story-viewer-container {
+      position: relative;
+      max-width: 500px;
+      max-height: 90vh;
+      width: 100%;
+      background: var(--bg-card);
+      border-radius: var(--radius-2xl);
+      overflow: hidden;
+      animation: scaleIn 0.3s ease;
+    }
+
+    .story-close-btn {
+      position: absolute;
+      top: var(--space-4);
+      right: var(--space-4);
+      width: 40px;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      border-radius: var(--radius-full);
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition-base);
+    }
+
+    .story-close-btn:hover {
+      background: rgba(0, 0, 0, 0.8);
+      transform: scale(1.1);
+    }
+
+    .story-viewer-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: var(--space-4);
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), transparent);
+      z-index: 5;
+    }
+
+    .story-author-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .story-author-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: var(--text-sm);
+      border: 2px solid white;
+    }
+
+    .story-author-name {
+      color: white;
+      font-weight: 600;
+      font-size: var(--text-sm);
+    }
+
+    .story-viewer-content {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: black;
+    }
+
+    .story-viewer-content img {
+      max-width: 100%;
+      max-height: 90vh;
+      object-fit: contain;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
   `]
 })
 export class FeedComponent implements OnInit {
   private platformId = inject(PLATFORM_ID);
+  private api = inject(FeedApiService);
+  public auth = inject(AuthService);
+  public ui = inject(UiStore);
 
   @ViewChild('storyModal') storyModal!: CreateStoryModalComponent;
   @ViewChild('postModal') postModal!: CreatePostModalComponent;
 
   toastMessage: string | null = null;
+  userHasStory = signal(false);
+
+  constructor() {
+    effect(() => {
+      if (this.ui.showCreatePostModal()) {
+        this.postModal.open();
+        this.ui.closeCreatePostModal(); // Toggle back immediately after opening
+      }
+    });
+  }
 
   readonly HeartIcon = Heart;
   readonly CommentIcon = MessageCircle;
@@ -804,80 +807,58 @@ export class FeedComponent implements OnInit {
   readonly ImageIcon = Image;
   readonly SendIcon = Send;
 
-  stories = [
-    { id: 1, label: 'Study Group', initials: 'SG', gradient: 'var(--gradient-primary)', hasNew: true },
-    { id: 2, label: 'CS Lecture', initials: 'CS', gradient: 'var(--gradient-secondary)', hasNew: true },
-    { id: 3, label: 'Lab Session', initials: 'LS', gradient: 'var(--gradient-success)', hasNew: false },
-    { id: 4, label: 'Research', initials: 'R', gradient: 'var(--gradient-sunset)', hasNew: false }
-  ];
-
-  posts: Post[] = [
-    {
-      id: 1,
-      author: { name: 'Dr. Sarah Johnson', initials: 'SJ', gradient: 'var(--gradient-primary)' },
-      course: 'CS 301',
-      timeAgo: '2h ago',
-      title: 'New Research Paper on Quantum Computing',
-      description: 'Excited to share our latest findings on quantum entanglement and its applications in cryptography. This could revolutionize how we think about secure communications.',
-      image: 'var(--gradient-ocean)',
-      tags: ['Quantum', 'Research', 'Cryptography'],
-      likes: 234,
-      comments: 45,
-      isLiked: false,
-      isSaved: false,
-      location: 'Science Building',
-      commentsList: []
-    },
-    {
-      id: 2,
-      author: { name: 'Marcus Chen', initials: 'MC', gradient: 'var(--gradient-secondary)' },
-      course: 'MATH 205',
-      timeAgo: '5h ago',
-      title: 'Study Group for Final Exam',
-      description: '',
-      image: null,
-      tags: ['Study Group', 'Linear Algebra'],
-      likes: 89,
-      comments: 23,
-      isLiked: false,
-      isSaved: false,
-      commentsList: []
-    },
-    {
-      id: 3,
-      author: { name: 'Prof. Anderson', initials: 'PA', gradient: 'var(--gradient-success)' },
-      course: 'PHYS 201',
-      timeAgo: '1d ago',
-      title: 'Lab Report Guidelines Updated',
-      description: 'Please review the updated guidelines for lab reports. Pay special attention to the new formatting requirements and citation style.',
-      image: 'var(--gradient-sunset)',
-      tags: ['Lab', 'Guidelines'],
-      likes: 156,
-      comments: 12,
-      isLiked: false,
-      isSaved: true,
-      commentsList: []
-    }
-  ];
+  stories: Story[] = [];
+  posts: Post[] = [];
 
   ngOnInit() {
     this.loadPosts();
+    this.loadStories();
   }
 
   loadPosts() {
-    if (isPlatformBrowser(this.platformId)) {
-      const savedPosts = localStorage.getItem('aau-connect-posts');
-      if (savedPosts) {
-        try {
-          const parsed = JSON.parse(savedPosts);
-          if (Array.isArray(parsed)) {
-            this.posts = parsed;
-          }
-        } catch (e) {
-          console.error('Failed to load posts', e);
-        }
+    this.api.getFeed().subscribe({
+      next: (posts) => {
+        this.posts = posts;
+      },
+      error: (err) => {
+        console.error('Error loading feed:', err);
+        this.showToast('Failed to load feed');
       }
+    });
+  }
+
+  loadStories() {
+    this.api.getStories().subscribe({
+      next: (stories) => {
+        this.stories = stories;
+        // Check if current user has an active story
+        const currentUser = this.auth.currentUser();
+        if (currentUser) {
+          const hasStory = stories.some(s => s.author._id === currentUser._id);
+          this.userHasStory.set(hasStory);
+        }
+      },
+      error: (err) => console.error('Error loading stories:', err)
+    });
+  }
+
+  onUserStoryClick() {
+    if (this.userHasStory()) {
+      const myStory = this.stories.find(s => s.author._id === this.auth.currentUser()?._id);
+      if (myStory) this.viewStory(myStory);
+    } else {
+      this.storyModal.open();
     }
+  }
+
+  currentStoryView = signal<Story | null>(null);
+
+  viewStory(story: Story) {
+    this.currentStoryView.set(story);
+  }
+
+  closeStoryViewer() {
+    this.currentStoryView.set(null);
   }
 
   savePosts() {
@@ -887,76 +868,99 @@ export class FeedComponent implements OnInit {
   }
 
   onStoryCreated(file: File) {
-    console.log('Story created:', file);
-    // Here you would upload the story to the server
-    // For now, just log it
-    this.showToast('Story uploaded successfully!');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      this.api.createStory(content).subscribe({
+        next: (newStory) => {
+          this.stories.unshift(newStory);
+          this.showToast('Story uploaded successfully!');
+        },
+        error: (err) => {
+          console.error('Error creating story:', err);
+          this.showToast('Failed to upload story');
+        }
+      });
+    };
+    reader.readAsDataURL(file);
   }
 
   onPostCreated(post: any) {
-    console.log('Post created:', post);
-    // Add new post to the beginning of the feed
-    const newPost: Post = {
-      id: Date.now(),
-      author: { name: 'You', initials: 'YO', gradient: 'var(--primary-600)' },
-      course: 'General',
-      timeAgo: 'Just now',
-      title: 'New Snapshot',
+    const postData = {
+      title: post.caption?.substring(0, 50) || 'New Snapshot',
       description: post.caption || '',
-      image: post.media ? (post.media.startsWith('data:') ? 'url(' + post.media + ')' : post.media) : null,
+      image: post.media || null,
       tags: post.tags || [],
       location: post.location || null,
       filters: post.filters || null,
-      likes: 0,
-      comments: 0,
-      isLiked: false,
-      isSaved: false,
-      showComments: false,
-      commentsList: []
+      course: 'General'
     };
-    this.posts.unshift(newPost);
-    this.savePosts();
+
+    this.api.createPost(postData).subscribe({
+      next: (newPost) => {
+        this.showToast('Post shared successfully!');
+        // Reload the entire feed to get fresh data from backend
+        this.loadPosts();
+      },
+      error: (err) => {
+        console.error('Error creating post:', err);
+        this.showToast('Failed to share post');
+      }
+    });
   }
 
   toggleLike(post: Post) {
-    post.isLiked = !post.isLiked;
-    post.likes += post.isLiked ? 1 : -1;
-    this.savePosts();
+    this.api.toggleLike(post._id).subscribe({
+      next: (likes) => {
+        post.likes = likes;
+      }
+    });
   }
 
   toggleSave(post: Post) {
-    post.isSaved = !post.isSaved;
-    this.savePosts();
-    this.showToast(post.isSaved ? 'Post saved to bookmarks' : 'Post removed from bookmarks');
+    this.api.toggleSave(post._id).subscribe({
+      next: (saves) => {
+        post.isSaved = saves;
+        const isCurrentlySaved = saves.includes(this.auth.currentUser()?._id || '');
+        this.showToast(isCurrentlySaved ? 'Post saved to bookmarks' : 'Post removed from bookmarks');
+      }
+    });
   }
 
   toggleComments(post: Post) {
     post.showComments = !post.showComments;
-    if (!post.commentsList) {
-      post.commentsList = [];
+    if (post.showComments && (!post.commentsList || post.commentsList.length === 0)) {
+      this.api.getComments(post._id).subscribe({
+        next: (comments) => {
+          post.commentsList = comments;
+        }
+      });
     }
   }
 
   addComment(post: Post, text: string) {
     if (!text.trim()) return;
 
-    if (!post.commentsList) post.commentsList = [];
-
-    post.commentsList.push({
-      id: Date.now(),
-      author: 'You',
-      initials: 'YO',
-      text: text,
-      timestamp: new Date()
+    this.api.addComment(post._id, text).subscribe({
+      next: (comment) => {
+        if (!post.commentsList) post.commentsList = [];
+        post.commentsList.push(comment);
+        this.showToast('Comment added');
+      }
     });
-
-    post.comments++;
-    this.savePosts();
   }
 
   sharePost(post: Post) {
     navigator.clipboard.writeText(window.location.href);
     this.showToast('Link copied to clipboard!');
+  }
+
+  isLiked(post: Post): boolean {
+    return post.likes.includes(this.auth.currentUser()?._id || '');
+  }
+
+  isSaved(post: Post): boolean {
+    return post.isSaved.includes(this.auth.currentUser()?._id || '');
   }
 
   showToast(message: string) {

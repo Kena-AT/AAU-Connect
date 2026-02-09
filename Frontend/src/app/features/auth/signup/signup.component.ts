@@ -95,6 +95,10 @@ import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
           </div>
         </form>
         
+        <div *ngIf="errorMessage()" class="global-error">
+          {{ errorMessage() }}
+        </div>
+        
         <div class="footer">
           Already have an account? <a routerLink="/login">Login</a>
         </div>
@@ -160,6 +164,17 @@ import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
     .btn.full { width: 100%; }
     .footer { text-align: center; margin-top: 1.5rem; font-size: var(--text-sm); }
 
+    .global-error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger-500);
+      padding: 0.75rem;
+      border-radius: var(--radius-md);
+      margin-top: 1rem;
+      font-size: var(--text-sm);
+      text-align: center;
+      border: 1px solid var(--danger-500);
+    }
+
     .theme-toggle {
       position: absolute;
       top: 2rem;
@@ -196,6 +211,7 @@ export class SignupComponent {
 
   step = signal(1);
   creating = signal(false);
+  errorMessage = signal<string | null>(null);
 
   signupForm = this.fb.group({
     email: ['', [Validators.required, Validators.pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)]],
@@ -226,16 +242,21 @@ export class SignupComponent {
   }
 
   nextStep() {
+    this.errorMessage.set(null);
     if (this.step() === 1) {
-      const emailCtrl = this.signupForm.get('email');
-      const passCtrl = this.signupForm.get('password');
-      if (emailCtrl?.invalid || passCtrl?.invalid) {
-        emailCtrl?.markAsTouched();
-        passCtrl?.markAsTouched();
+      if (this.signupForm.get('email')?.invalid || this.signupForm.get('password')?.invalid) {
+        this.signupForm.get('email')?.markAsTouched();
+        this.signupForm.get('password')?.markAsTouched();
+        return;
+      }
+    } else if (this.step() === 2) {
+      if (this.signupForm.get('firstName')?.invalid || this.signupForm.get('lastName')?.invalid || this.signupForm.get('studentId')?.invalid) {
+        this.signupForm.get('firstName')?.markAsTouched();
+        this.signupForm.get('lastName')?.markAsTouched();
+        this.signupForm.get('studentId')?.markAsTouched();
         return;
       }
     }
-    // Validation for step 2 ...
 
     this.step.update(s => s + 1);
   }
@@ -248,10 +269,18 @@ export class SignupComponent {
     if (this.signupForm.invalid) return;
 
     this.creating.set(true);
-    // Mock Signup
-    setTimeout(() => {
-      this.creating.set(false);
-      this.router.navigate(['/login']);
-    }, 1500);
+    this.errorMessage.set(null);
+    
+    this.auth.signup(this.signupForm.value).subscribe({
+      next: () => {
+        this.creating.set(false);
+        this.router.navigate(['/dashboard']);
+      },
+      error: (err) => {
+        this.creating.set(false);
+        this.errorMessage.set(err.error?.message || 'Registration failed. Please try again.');
+        console.error('Signup error:', err);
+      }
+    });
   }
 }

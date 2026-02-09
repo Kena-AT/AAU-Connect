@@ -9,13 +9,12 @@ import { UiStore } from '../../core/state/ui.store';
 @Component({
   selector: 'app-dashboard-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, SidebarComponent, TopbarComponent, RightSidebarComponent],
+  imports: [CommonModule, RouterOutlet, SidebarComponent, RightSidebarComponent],
   template: `
     <div class="layout-container" [style.grid-template-columns]="ui.rightSidebarOpen() ? 'var(--sidebar-width) minmax(600px, 800px) var(--right-sidebar-width)' : 'var(--sidebar-width) 1fr'">
       <app-sidebar class="left-sidebar glass"></app-sidebar>
       
       <div class="center-content">
-        <app-topbar></app-topbar>
         <div class="feed-wrapper">
           <router-outlet></router-outlet>
         </div>
@@ -28,68 +27,67 @@ import { UiStore } from '../../core/state/ui.store';
   `,
   styles: [`
     .layout-container {
-      display: grid;
-      grid-template-columns: 260px minmax(600px, 800px) 340px;
-      justify-content: center;
+      display: flex;
       height: 100vh;
-      width: 100%;
-      max-width: 1600px;
-      margin: 0 auto;
+      width: 100vw;
       background-color: var(--bg-app);
       overflow: hidden;
-      gap: var(--space-8);
-      padding: 0 var(--space-8);
     }
     
     .left-sidebar {
-      position: sticky;
-      top: 0;
       height: 100vh;
-      overflow-y: auto;
-      padding: var(--space-4) 0;
+      width: 72px;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1000;
+      border-right: 1px solid var(--border-glass);
+      background: var(--bg-app);
+      flex-shrink: 0;
+    }
+
+    .left-sidebar:hover {
+      width: 240px;
     }
 
     .center-content {
+      flex: 1;
       display: flex;
       flex-direction: column;
       height: 100vh;
       overflow: hidden;
+      align-items: center;
     }
 
     .feed-wrapper {
-      flex: 1;
+      width: 100%;
+      max-width: 900px;
+      height: 100%;
       overflow-y: auto;
-      padding: 0;
+      scrollbar-width: none;
     }
+    .feed-wrapper::-webkit-scrollbar { display: none; }
 
     .right-sidebar {
-      position: sticky;
-      top: 0;
+      width: 320px;
       height: 100vh;
       overflow-y: auto;
-      padding: var(--space-4) 0;
+      border-left: 1px solid var(--border-glass);
+      flex-shrink: 0;
     }
 
-    @media (max-width: 1400px) {
-      .layout-container {
-        grid-template-columns: 240px 1fr;
-        gap: var(--space-6);
-      }
-      
+    @media (max-width: 1264px) {
       .right-sidebar {
         display: none;
       }
     }
 
     @media (max-width: 768px) {
-      .layout-container {
-        grid-template-columns: 1fr;
-        padding: 0;
-        gap: 0;
-      }
-      
       .left-sidebar {
-        display: none;
+        width: 0;
+        border: none;
+        overflow: hidden;
+      }
+      .feed-wrapper {
+        max-width: 100%;
       }
     }
   `]

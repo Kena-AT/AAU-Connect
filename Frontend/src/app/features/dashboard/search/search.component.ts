@@ -309,15 +309,6 @@ export class SearchComponent {
     { label: 'Events', value: 'events', icon: Calendar }
   ];
 
-  // Mock data
-  mockResults = [
-    { id: 1, type: 'course', title: 'CS 301: Data Structures', description: 'Advanced data structures and algorithms', color: 'var(--gradient-primary)' },
-    { id: 2, type: 'people', title: 'Sarah Chen', description: 'Computer Science • Junior', color: 'var(--gradient-secondary)' },
-    { id: 3, type: 'groups', title: 'Study Group: Machine Learning', description: '24 members • Public', color: 'var(--gradient-success)' },
-    { id: 4, type: 'events', title: 'Tech Talk: AI in Healthcare', description: 'Tomorrow at 2:00 PM', color: 'var(--gradient-sunset)' },
-    { id: 5, type: 'people', title: 'Marcus Johnson', description: 'Physics • Senior', color: 'var(--gradient-ocean)' },
-    { id: 6, type: 'course', title: 'MATH 205: Linear Algebra', description: 'Introduction to linear algebra', color: 'var(--gradient-fire)' }
-  ];
 
   filteredResults = signal<any[]>([]);
 
@@ -330,16 +321,10 @@ export class SearchComponent {
 
     this.isSearching.set(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const filtered = this.mockResults.filter(r =>
-        r.title.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-        r.description.toLowerCase().includes(this.searchQuery.toLowerCase())
-      );
-      this.results.set(filtered);
-      this.applyFilter();
-      this.isSearching.set(false);
-    }, 300);
+    // TODO: Integrate with real Search API
+    this.results.set([]);
+    this.filteredResults.set([]);
+    this.isSearching.set(false);
   }
 
   setFilter(filter: string) {

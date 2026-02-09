@@ -11,6 +11,9 @@ export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
 
+  private readonly API_URL = 'http://localhost:5000/api/auth';
+  private readonly TOKEN_KEY = 'aau_connect_token';
+
   // State
   private _currentUser = signal<User | null>(null);
 
@@ -20,46 +23,50 @@ export class AuthService {
   readonly isVerified = computed(() => this._currentUser()?.isVerified ?? false);
 
   constructor() {
-    // Attempt to restore session on init
     this.checkSession().subscribe();
   }
 
   // Actions
-  login(credentials: any): Observable<User> {
-    // MOCK LOGIN FOR MVP (Simulating Backend)
-    const mockUser: User = {
-      id: '1',
-      email: credentials.email,
-      firstName: 'Student',
-      lastName: 'User',
-      role: 'student',
-      isVerified: true, // Auto-verify for demo
-      department: 'CS'
-    };
-
-    this._currentUser.set(mockUser);
-    return of(mockUser);
-
-    // Original implementation for Real Backend:
-    /*
-    return this.http.post<User>('/api/auth/login', credentials).pipe(
-      tap(user => this._currentUser.set(user))
+  signup(userData: any): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}/signup`, userData).pipe(
+      tap(response => {
+        if (response.success && response.token) {
+          localStorage.setItem(this.TOKEN_KEY, response.token);
+          this._currentUser.set(response.user);
+        }
+      })
     );
-    */
   }
 
+  login(credentials: any): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}/login`, credentials).pipe(
+      tap(response => {
+        if (response.success && response.token) {
+          localStorage.setItem(this.TOKEN_KEY, response.token);
+          this._currentUser.set(response.user);
+        }
+      })
+    );
+  }
 
   logout(): void {
-    this.http.post('/api/auth/logout', {}).subscribe(() => {
-      this._currentUser.set(null);
-      this.router.navigate(['/login']);
-    });
+    localStorage.removeItem(this.TOKEN_KEY);
+    this._currentUser.set(null);
+    this.router.navigate(['/login']);
   }
 
   checkSession(): Observable<User | null> {
-    return this.http.get<User>('/api/auth/me').pipe(
-      tap(user => this._currentUser.set(user)),
+    const token = localStorage.getItem(this.TOKEN_KEY);
+    if (!token) return of(null);
+
+    return this.http.get<any>(`${this.API_URL}/me`).pipe(
+      tap(response => {
+        if (response.success) {
+          this._currentUser.set(response.data);
+        }
+      }),
       catchError(() => {
+        localStorage.removeItem(this.TOKEN_KEY);
         this._currentUser.set(null);
         return of(null);
       })

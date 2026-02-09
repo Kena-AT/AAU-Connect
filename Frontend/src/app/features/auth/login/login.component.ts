@@ -49,6 +49,10 @@ import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
           </div>
         </form>
 
+        <div *ngIf="errorMessage()" class="global-error">
+          {{ errorMessage() }}
+        </div>
+
         <div class="footer">
           Don't have an account? <a routerLink="/signup">Sign up</a>
         </div>
@@ -131,6 +135,17 @@ import { LucideAngularModule, Sun, Moon } from 'lucide-angular';
       box-shadow: var(--shadow-md);
       color: var(--primary-600);
     }
+
+    .global-error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger-500);
+      padding: 0.75rem;
+      border-radius: var(--radius-md);
+      margin-top: 1rem;
+      font-size: var(--text-sm);
+      text-align: center;
+      border: 1px solid var(--danger-500);
+    }
   `]
 })
 export class LoginComponent {
@@ -143,6 +158,7 @@ export class LoginComponent {
   readonly MoonIcon = Moon;
 
   loading = signal(false);
+  errorMessage = signal<string | null>(null);
 
   loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)]],
@@ -165,6 +181,7 @@ export class LoginComponent {
     if (this.loginForm.invalid) return;
 
     this.loading.set(true);
+    this.errorMessage.set(null);
 
     this.auth.login(this.loginForm.value).subscribe({
       next: () => {
@@ -173,6 +190,7 @@ export class LoginComponent {
       },
       error: (err) => {
         this.loading.set(false);
+        this.errorMessage.set(err.error?.message || 'Login failed. Please check your credentials.');
         console.error(err);
       }
     });

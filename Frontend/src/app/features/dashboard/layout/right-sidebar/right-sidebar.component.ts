@@ -17,7 +17,7 @@ import { LucideAngularModule, TrendingUp, Users, Calendar, Plus } from 'lucide-a
         <div class="trending-list">
           @for (topic of trendingTopics; track topic.id) {
             <div class="trending-item shimmer">
-              <div class="trend-icon blob" [style.background]="topic.gradient"></div>
+              <div class="trend-icon" [style.background]="topic.gradient"></div>
               <div class="trend-info">
                 <p class="trend-title">{{ topic.title }}</p>
                 <span class="trend-meta">{{ topic.papers }} papers</span>
@@ -102,7 +102,6 @@ import { LucideAngularModule, TrendingUp, Users, Calendar, Plus } from 'lucide-a
       width: 20px;
       height: 20px;
       color: var(--primary-500);
-      animation: float 4s ease-in-out infinite;
     }
 
     .widget-title {

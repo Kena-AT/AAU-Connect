@@ -511,16 +511,9 @@ export class GroupDetailComponent implements OnInit {
   readonly FileIcon = FileText;
   readonly DownloadIcon = Download;
 
-  // Mock Data (Migrated from Academic)
-  assignments = signal([
-    { id: 1, title: 'Project Proposal', dueDate: 'Tomorrow, 11:59 PM', status: 'pending', color: 'var(--gradient-primary)' },
-    { id: 2, title: 'Chapter 4 Quiz', dueDate: 'completed', status: 'completed', color: 'var(--gradient-success)' }
-  ]);
-
-  resources = signal([
-    { id: 1, title: 'Course Syllabus', type: 'PDF', size: '1.2 MB', color: 'var(--gradient-primary)' },
-    { id: 2, title: 'Week 1 Slides', type: 'PPTX', size: '5.4 MB', color: 'var(--gradient-accent)' }
-  ]);
+  // Data signals
+  assignments = signal<any[]>([]);
+  resources = signal<any[]>([]);
 
   ngOnInit() {
     this.route.paramMap.subscribe(params => {

@@ -13,6 +13,10 @@ export class UiStore {
   private _rightSidebarOpen = signal<boolean>(true);
   readonly rightSidebarOpen = this._rightSidebarOpen.asReadonly();
 
+  // Modal states
+  private _showCreatePostModal = signal<boolean>(false);
+  readonly showCreatePostModal = this._showCreatePostModal.asReadonly();
+
   // Theme state
   private _theme = signal<Theme>(this.getInitialTheme());
   readonly theme = this._theme.asReadonly();
@@ -39,6 +43,19 @@ export class UiStore {
 
   toggleRightSidebar() {
     this._rightSidebarOpen.update(open => !open);
+  }
+
+  // Modal actions
+  toggleCreatePostModal() {
+    this._showCreatePostModal.update(open => !open);
+  }
+
+  openCreatePostModal() {
+    this._showCreatePostModal.set(true);
+  }
+
+  closeCreatePostModal() {
+    this._showCreatePostModal.set(false);
   }
 
   // Theme actions
