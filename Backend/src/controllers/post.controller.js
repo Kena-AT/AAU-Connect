@@ -63,7 +63,7 @@ exports.toggleLike = async (req, res) => {
     }
 
     // Check if user already liked it
-    const index = post.likes.indexOf(req.user.id);
+    const index = post.likes.findIndex(id => id.toString() === req.user.id);
 
     if (index === -1) {
       post.likes.push(req.user.id);
@@ -99,7 +99,7 @@ exports.toggleSave = async (req, res) => {
       });
     }
 
-    const index = post.isSaved.indexOf(req.user.id);
+    const index = post.isSaved.findIndex(id => id.toString() === req.user.id);
 
     if (index === -1) {
       post.isSaved.push(req.user.id);
@@ -112,6 +112,71 @@ exports.toggleSave = async (req, res) => {
     res.status(200).json({
       success: true,
       data: post.isSaved
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+// @desc    Delete a post
+// @route   DELETE /api/posts/:id
+// @access  Private (Owner only)
+exports.deletePost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    // Check ownership
+    if (post.author.toString() !== req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authorized to delete this post'
+      });
+    }
+
+    await post.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      data: {}
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+// @desc    Report a post
+// @route   POST /api/posts/:id/report
+// @access  Private
+exports.reportPost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({
+        success: false,
+        message: 'Post not found'
+      });
+    }
+
+    // Placeholder: In a real app, we'd save this to a Reports collection
+    console.log(`Post ${post._id} reported by user ${req.user.id}`);
+
+    res.status(200).json({
+      success: true,
+      data: 'Post reported'
     });
   } catch (err) {
     res.status(500).json({

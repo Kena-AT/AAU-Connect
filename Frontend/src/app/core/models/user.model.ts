@@ -2,7 +2,8 @@ export type UserRole = 'student' | 'cr' | 'admin' | 'moderator';
 // Updated for AAU Connect UI Refinement
 
 export interface User {
-  _id: string;
+  _id?: string;
+  id: string; // Mapping standard
   email: string;
   firstName: string;
   lastName: string;
@@ -13,4 +14,6 @@ export interface User {
   isVerified: boolean;
   department?: string;
   avatarUrl?: string;
+  followers?: string[];
+  following?: string[];
 }

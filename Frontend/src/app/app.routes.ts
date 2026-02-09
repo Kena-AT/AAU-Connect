@@ -27,6 +27,7 @@ export const routes: Routes = [
       { path: 'events', loadComponent: () => import('./features/dashboard/events/events.component').then(m => m.EventsComponent) },
       { path: 'settings', loadComponent: () => import('./features/dashboard/settings/settings-page.component').then(m => m.SettingsPageComponent) },
       { path: 'search', loadComponent: () => import('./features/dashboard/search/search.component').then(m => m.SearchComponent) },
+      { path: 'profile/:id', loadComponent: () => import('./features/dashboard/profile/profile-page.component').then(m => m.ProfilePageComponent) },
     ]
   },
   { path: '**', redirectTo: '' }

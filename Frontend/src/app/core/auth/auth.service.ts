@@ -76,4 +76,11 @@ export class AuthService {
   hasRole(role: UserRole): boolean {
     return this._currentUser()?.role === role;
   }
+
+  updateUser(userData: Partial<User>): void {
+    const current = this._currentUser();
+    if (current) {
+      this._currentUser.set({ ...current, ...userData });
+    }
+  }
 }

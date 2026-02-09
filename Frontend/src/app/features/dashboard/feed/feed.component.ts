@@ -1,20 +1,22 @@
-import { Component, ViewChild, signal, OnInit, inject, PLATFORM_ID } from '@angular/core';
+import { Component, ViewChild, signal, OnInit, inject, PLATFORM_ID, HostListener, effect } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { LucideAngularModule, Heart, MessageCircle, Bookmark, Share2, MoreVertical, Plus, Edit, Image, Send } from 'lucide-angular';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+import { LucideAngularModule, Heart, MessageCircle, Bookmark, Share2, MoreVertical, Plus, Edit, Image, Send, Trash, Flag } from 'lucide-angular';
 import { CreateStoryModalComponent } from '../../../shared/components/create-story-modal/create-story-modal.component';
 import { CreatePostModalComponent } from '../../../shared/components/create-post-modal/create-post-modal.component';
 import { User } from '../../../core/models/user.model';
 
 import { Post, PostComment, Story } from '../../../core/models/post.model';
 import { FeedApiService } from '../../../core/api/feed-api.service';
+import { UserApiService } from '../../../core/api/user-api.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { UiStore } from '../../../core/state/ui.store';
-import { effect } from '@angular/core';
 
 @Component({
   selector: 'app-feed',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, CreateStoryModalComponent, CreatePostModalComponent],
+  imports: [CommonModule, LucideAngularModule, FormsModule, CreateStoryModalComponent, CreatePostModalComponent],
   template: `
     <div class="feed-container">
       <!-- Stories Bar -->
@@ -89,20 +91,58 @@ import { effect } from '@angular/core';
             <!-- Post Header -->
             <div class="post-header">
               <div class="post-author">
-                <div class="author-avatar gradient-text" [style.background]="post.author.gradient">
+                <div class="author-avatar gradient-text" 
+                     [style.background]="post.author.gradient"
+                     (click)="navigateToProfile(post.author._id)">
                   {{ post.author.initials }}
                 </div>
                 <div class="author-info">
-                  <p class="author-name">{{ post.author.firstName }} {{ post.author.lastName }}</p>
+                  <p class="author-name" (click)="navigateToProfile(post.author._id)">
+                    {{ post.author.firstName }} {{ post.author.lastName }}
+                  </p>
                   <span class="post-meta">
                     {{ post.course }} • {{ post.createdAt | date:'shortTime' }}
                     @if (post.location) { • {{ post.location }} }
                   </span>
                 </div>
               </div>
-              <button class="btn-more btn-interactive">
-                <lucide-icon [img]="MoreIcon" class="icon"></lucide-icon>
-              </button>
+              
+              <div class="header-actions">
+                @if (post.author._id !== auth.currentUser()?._id) {
+                  <button 
+                    class="btn-follow" 
+                    [class.following]="isFollowing(post.author._id)"
+                    (click)="toggleFollow(post.author._id)">
+                    {{ isFollowing(post.author._id) ? 'Following' : 'Follow' }}
+                  </button>
+                }
+                
+                <div class="dropdown-container">
+                  <button class="btn-more btn-interactive" (click)="toggleMoreMenu(post._id, $event)">
+                    <lucide-icon [img]="MoreIcon" class="icon"></lucide-icon>
+                  </button>
+                  
+                  @if (openMoreMenuId() === post._id) {
+                    <div class="dropdown-menu glass-card">
+                      @if (post.author._id === auth.currentUser()?._id) {
+                        <button class="menu-item danger" (click)="deletePost(post._id)">
+                          <lucide-icon [img]="TrashIcon" class="icon"></lucide-icon>
+                          <span>Delete Post</span>
+                        </button>
+                      } @else {
+                        <button class="menu-item" (click)="reportPost(post._id)">
+                          <lucide-icon [img]="ReportIcon" class="icon"></lucide-icon>
+                          <span>Report Post</span>
+                        </button>
+                      }
+                      <button class="menu-item" (click)="sharePost(post)">
+                        <lucide-icon [img]="ShareIcon" class="icon"></lucide-icon>
+                        <span>Share Link</span>
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
             </div>
 
             <!-- Post Content -->
@@ -335,6 +375,12 @@ import { effect } from '@angular/core';
       flex-shrink: 0;
       box-shadow: var(--shadow-lg);
       position: relative;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .author-avatar:hover {
+      transform: scale(1.05);
     }
 
     .author-avatar::after {
@@ -358,6 +404,12 @@ import { effect } from '@angular/core';
       font-weight: 700;
       color: var(--text-primary);
       margin: 0;
+      cursor: pointer;
+    }
+
+    .author-name:hover {
+      color: var(--primary-500);
+      text-decoration: underline;
     }
 
     .post-meta {
@@ -388,16 +440,92 @@ import { effect } from '@angular/core';
 
     .btn-more:hover {
       background: var(--bg-card);
-      transform: rotate(90deg);
+      transform: translateY(-2px);
     }
 
     .btn-more:hover .icon {
       color: var(--text-primary);
     }
 
+    .dropdown-container {
+      position: relative;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      width: 180px;
+      z-index: 1000;
+      padding: var(--space-2);
+      background: var(--bg-card);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-xl);
+      animation: slideDown 0.2s ease;
+      box-shadow: var(--shadow-xl);
+    }
+
+    .menu-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: var(--radius-lg);
+      transition: all 0.2s;
+    }
+
+    .menu-item:hover {
+      background: var(--bg-glass);
+      color: var(--primary-500);
+    }
+
+    .menu-item.danger {
+      color: var(--danger-500);
+    }
+
+    .menu-item.danger:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
     /* Post Content */
     .post-content {
       padding: 0 var(--space-5) var(--space-5);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .btn-follow {
+      padding: var(--space-1) var(--space-4);
+      border-radius: var(--radius-full);
+      border: 1px solid var(--primary-500);
+      background: transparent;
+      color: var(--primary-500);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      cursor: pointer;
+      transition: all var(--transition-base);
+    }
+
+    .btn-follow:hover {
+      background: var(--primary-50);
+      transform: translateY(-1px);
+    }
+
+    .btn-follow.following {
+      background: var(--primary-500);
+      color: white;
     }
 
     .post-title {
@@ -779,6 +907,8 @@ import { effect } from '@angular/core';
 export class FeedComponent implements OnInit {
   private platformId = inject(PLATFORM_ID);
   private api = inject(FeedApiService);
+  private userApi = inject(UserApiService);
+  private router = inject(Router);
   public auth = inject(AuthService);
   public ui = inject(UiStore);
 
@@ -787,6 +917,8 @@ export class FeedComponent implements OnInit {
 
   toastMessage: string | null = null;
   userHasStory = signal(false);
+  followingIds = signal<Set<string>>(new Set());
+  openMoreMenuId = signal<string | null>(null);
 
   constructor() {
     effect(() => {
@@ -795,6 +927,39 @@ export class FeedComponent implements OnInit {
         this.ui.closeCreatePostModal(); // Toggle back immediately after opening
       }
     });
+
+    effect(() => {
+      const user = this.auth.currentUser();
+      if (user && user.following) {
+        this.followingIds.set(new Set(user.following));
+      }
+    });
+  }
+
+  toggleFollow(userId: string) {
+    this.userApi.toggleFollow(userId).subscribe({
+      next: (res) => {
+        const ids = new Set(this.followingIds());
+        if (res.isFollowing) {
+          ids.add(userId);
+        } else {
+          ids.delete(userId);
+        }
+        this.followingIds.set(ids);
+        
+        // Update current user in auth service to persist local state
+        const currentUser = this.auth.currentUser();
+        if (currentUser) {
+          this.auth.updateUser({
+            following: Array.from(ids)
+          });
+        }
+      }
+    });
+  }
+
+  isFollowing(userId: string): boolean {
+    return this.followingIds().has(userId);
   }
 
   readonly HeartIcon = Heart;
@@ -806,6 +971,8 @@ export class FeedComponent implements OnInit {
   readonly EditIcon = Edit;
   readonly ImageIcon = Image;
   readonly SendIcon = Send;
+  readonly TrashIcon = Trash;
+  readonly ReportIcon = Flag;
 
   stories: Story[] = [];
   posts: Post[] = [];
@@ -951,16 +1118,65 @@ export class FeedComponent implements OnInit {
   }
 
   sharePost(post: Post) {
-    navigator.clipboard.writeText(window.location.href);
-    this.showToast('Link copied to clipboard!');
+    const shareUrl = `${window.location.origin}/dashboard/feed/${post._id}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      this.showToast('Link copied to clipboard!');
+      this.openMoreMenuId.set(null);
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+      this.showToast('Failed to copy link');
+    });
+  }
+
+  toggleMoreMenu(postId: string, event: Event) {
+    event.stopPropagation();
+    if (this.openMoreMenuId() === postId) {
+      this.openMoreMenuId.set(null);
+    } else {
+      this.openMoreMenuId.set(postId);
+    }
+  }
+
+  @HostListener('document:click')
+  closeMenus() {
+    this.openMoreMenuId.set(null);
+  }
+
+  deletePost(postId: string) {
+    if (confirm('Are you sure you want to delete this post?')) {
+      this.api.deletePost(postId).subscribe({
+        next: () => {
+          this.posts = this.posts.filter(p => p._id !== postId);
+          this.showToast('Post deleted successfully');
+          this.openMoreMenuId.set(null);
+        },
+        error: (err) => {
+          console.error('Error deleting post:', err);
+          this.showToast('Failed to delete post');
+        }
+      });
+    }
+  }
+
+  reportPost(postId: string) {
+    this.api.reportPost(postId).subscribe({
+      next: () => {
+        this.showToast('Post reported for review');
+        this.openMoreMenuId.set(null);
+      }
+    });
+  }
+
+  navigateToProfile(userId: string) {
+    this.router.navigate(['/dashboard/profile', userId]);
   }
 
   isLiked(post: Post): boolean {
-    return post.likes.includes(this.auth.currentUser()?._id || '');
+    return post.likes?.includes(this.auth.currentUser()?._id || '') || false;
   }
 
   isSaved(post: Post): boolean {
-    return post.isSaved.includes(this.auth.currentUser()?._id || '');
+    return post.isSaved?.includes(this.auth.currentUser()?._id || '') || false;
   }
 
   showToast(message: string) {

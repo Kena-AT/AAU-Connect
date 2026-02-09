@@ -1,0 +1,35 @@
+# Guide: Fix Git Authentication for Kena-AT
+
+The goal is to resolve the `403 Forbidden` error when pushing to `AAU-Connect`. This guide will walk you through updating your Git configuration to use the correct GitHub account.
+
+## Steps to Take
+
+### 1. Update Remote URL
+First, we need to make sure Git knows to use the `Kena-AT` username for this repository. Run this command in your terminal:
+
+```powershell
+git remote set-url origin https://Kena-AT@github.com/Kena-AT/AAU-Connect.git
+```
+
+### 2. Configure Local Identity
+Set your local Git name and email to match your `Kena-AT` account. This ensures your commits are attributed correctly.
+
+```powershell
+git config user.name "Kena-AT"
+# Replace the email below with the email associated with your Kena-AT account
+git config user.email "your-email@example.com"
+```
+
+### 3. Clear Cached Credentials (If needed)
+If you are still prompted with the wrong account or see the 403 error, you might need to remove the old credentials from the Windows Credential Manager.
+
+1. Open **Credential Manager** from the Windows Search bar.
+2. Go to **Windows Credentials**.
+3. Look for `git:https://github.com` and **Remove** it.
+4. The next time you push, Windows will prompt you to log in. Make sure to log in as **Kena-AT**.
+
+## Verification
+Run a push to confirm it works:
+```powershell
+git push origin main
+```

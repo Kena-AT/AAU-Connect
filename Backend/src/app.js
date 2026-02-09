@@ -22,11 +22,15 @@ const auth = require('./routes/auth.routes');
 const posts = require('./routes/post.routes');
 const comments = require('./routes/comment.routes');
 const stories = require('./routes/story.routes');
+const users = require('./routes/user.routes');
+const search = require('./routes/search.routes');
 
 // Mount routes
 app.use('/api/auth', auth);
 app.use('/api/posts', posts);
 app.use('/api/comments', comments);
 app.use('/api/stories', stories);
+app.use('/api/users', users);
+app.use('/api/search', search);
 
 module.exports = app;

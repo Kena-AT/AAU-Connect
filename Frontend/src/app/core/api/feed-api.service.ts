@@ -60,4 +60,12 @@ export class FeedApiService {
       map(res => res.data)
     );
   }
+
+  deletePost(postId: string): Observable<any> {
+    return this.http.delete(`${this.API_URL}/posts/${postId}`);
+  }
+
+  reportPost(postId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/posts/${postId}/report`, {});
+  }
 }

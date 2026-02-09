@@ -71,25 +71,51 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
       </div>
       
       <!-- Content Section -->
-      <div class="events-container">
-        @if (store.loading()) {
-          <app-loading-spinner></app-loading-spinner>
-        } @else {
-          <div [class]="'events-' + viewMode()">
-            @for (event of filteredEvents(); track event.id) {
-              <app-event-card [event]="event"></app-event-card>
-            } @empty {
-              <app-empty-state
-                icon="📅"
-                title="No events found"
-                message="Try adjusting your search or category filters to find what you're looking for.">
-                <button class="btn-primary" (click)="searchQuery = ''; activeTab.set('all')">
-                  Clear All Filters
-                </button>
-              </app-empty-state>
-            }
-          </div>
-        }
+      <div class="events-main-layout">
+        <div class="events-container">
+          @if (store.loading()) {
+            <app-loading-spinner></app-loading-spinner>
+          } @else {
+            <div [class]="'events-' + viewMode()">
+              @for (event of filteredEvents(); track event.id) {
+                <app-event-card [event]="event"></app-event-card>
+              } @empty {
+                <app-empty-state
+                  icon="📅"
+                  title="No events found"
+                  message="Try adjusting your search or category filters to find what you're looking for.">
+                  <button class="btn-primary" (click)="searchQuery = ''; activeTab.set('all')">
+                    Clear All Filters
+                  </button>
+                </app-empty-state>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Secondary Sidebar for Events Page -->
+        <aside class="events-sidebar">
+          <section class="widget glass-card">
+            <div class="widget-header">
+              <lucide-icon [img]="CalendarIcon" class="widget-icon"></lucide-icon>
+              <h3 class="widget-title">Upcoming Deadlines</h3>
+            </div>
+            <div class="deadlines-list">
+              @for (deadline of upcomingDeadlines; track deadline.id) {
+                <div class="deadline-item neumorphic" [class.urgent]="deadline.urgent">
+                  <div class="deadline-date">
+                    <span class="day">{{ deadline.day }}</span>
+                    <span class="month">{{ deadline.month }}</span>
+                  </div>
+                  <div class="deadline-info">
+                    <p class="deadline-title">{{ deadline.title }}</p>
+                    <span class="deadline-course">{{ deadline.course }}</span>
+                  </div>
+                </div>
+              }
+            </div>
+          </section>
+        </aside>
       </div>
 
       <!-- Create Event Modal -->
@@ -262,13 +288,111 @@ import { LoadingSpinnerComponent } from '../../../shared/components/loading-spin
       gap: var(--space-4);
     }
 
-    @media (max-width: 1024px) {
-      .header-controls {
-        flex-direction: column;
-        align-items: stretch;
+    .events-main-layout {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: var(--space-8);
+      align-items: flex-start;
+    }
+
+    .events-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+
+    .widget {
+      padding: var(--space-6);
+    }
+
+    .widget-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .widget-icon {
+      width: 20px;
+      height: 20px;
+      color: var(--primary-500);
+    }
+
+    .widget-title {
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .deadlines-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .deadline-item {
+      display: flex;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      border-radius: var(--radius-xl);
+      border-left: 4px solid var(--primary-500);
+    }
+
+    .deadline-item.urgent {
+      border-left-color: var(--danger-500);
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    .deadline-date {
+      width: 44px;
+      height: 44px;
+      background: var(--gradient-primary);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .deadline-date .day {
+      font-size: var(--text-lg);
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .deadline-date .month {
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .deadline-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .deadline-title {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .deadline-course {
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    @media (max-width: 1200px) {
+      .events-main-layout {
+        grid-template-columns: 1fr;
       }
-      .custom-tabs {
-        overflow-x: auto;
+      .events-sidebar {
+        display: none;
       }
     }
   `]
@@ -280,11 +404,18 @@ export class EventsComponent implements OnInit {
   readonly SearchIcon = Search;
   readonly GridIcon = Grid;
   readonly ListIcon = ListIcon;
+  readonly CalendarIcon = CalendarIcon;
 
   searchQuery = '';
   activeTab = signal<'all' | EventType>('all');
   viewMode = signal<'grid' | 'list'>('grid');
   showCreateModal = signal(false);
+
+  upcomingDeadlines = [
+    { id: 1, day: '23', month: 'DEC', title: 'Final Project', course: 'CS 301', urgent: true },
+    { id: 2, day: '25', month: 'DEC', title: 'Research Paper', course: 'PHYS 201', urgent: false },
+    { id: 3, day: '28', month: 'DEC', title: 'Lab Report', course: 'CHEM 101', urgent: false }
+  ];
 
   tabs = [
     { id: 'all' as const, label: 'All Events' },

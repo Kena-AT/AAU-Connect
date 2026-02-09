@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LucideAngularModule, Search, User, Users, BookOpen, Calendar, X } from 'lucide-angular';
 import { Router } from '@angular/router';
+import { SearchApiService, SearchResult } from '../../../core/api/search-api.service';
 
 @Component({
   selector: 'app-search',
@@ -46,7 +47,7 @@ import { Router } from '@angular/router';
           </div>
         } @else if (isSearching()) {
           <div class="loading">Searching...</div>
-        } @else if (results().length === 0) {
+        } @else if (filteredResults().length === 0) {
           <div class="empty-state">
             <h3>No results found</h3>
             <p>Try adjusting your search terms</p>
@@ -70,6 +71,7 @@ import { Router } from '@angular/router';
       </div>
     </div>
   `,
+  // ... styles omitted for brevity, keeping them as they were ...
   styles: [`
     .search-page {
       width: 100%;
@@ -288,6 +290,7 @@ import { Router } from '@angular/router';
 })
 export class SearchComponent {
   private router = inject(Router);
+  private searchApi = inject(SearchApiService);
 
   readonly SearchIcon = Search;
   readonly UserIcon = User;
@@ -299,21 +302,21 @@ export class SearchComponent {
   searchQuery = '';
   activeFilter = signal<string>('all');
   isSearching = signal(false);
-  results = signal<any[]>([]);
+  results = signal<SearchResult[]>([]);
 
   filters = [
     { label: 'All', value: 'all', icon: Search },
     { label: 'People', value: 'people', icon: User },
-    { label: 'Groups', value: 'groups', icon: Users },
-    { label: 'Courses', value: 'courses', icon: BookOpen },
-    { label: 'Events', value: 'events', icon: Calendar }
+    // { label: 'Groups', value: 'groups', icon: Users },
+    // { label: 'Courses', value: 'courses', icon: BookOpen },
+    // { label: 'Events', value: 'events', icon: Calendar }
+    { label: 'Posts', value: 'posts', icon: BookOpen }
   ];
 
-
-  filteredResults = signal<any[]>([]);
+  filteredResults = signal<SearchResult[]>([]);
 
   onSearch() {
-    if (this.searchQuery.length === 0) {
+    if (this.searchQuery.length < 2) {
       this.results.set([]);
       this.filteredResults.set([]);
       return;
@@ -321,15 +324,23 @@ export class SearchComponent {
 
     this.isSearching.set(true);
 
-    // TODO: Integrate with real Search API
-    this.results.set([]);
-    this.filteredResults.set([]);
-    this.isSearching.set(false);
+    this.searchApi.search(this.searchQuery, this.activeFilter()).subscribe({
+      next: (data) => {
+        this.results.set(data);
+        this.applyFilter();
+        this.isSearching.set(false);
+      },
+      error: () => {
+        this.isSearching.set(false);
+        this.results.set([]);
+        this.filteredResults.set([]);
+      }
+    });
   }
 
   setFilter(filter: string) {
     this.activeFilter.set(filter);
-    this.applyFilter();
+    this.onSearch(); // Re-trigger search with new filter
   }
 
   applyFilter() {
@@ -345,15 +356,19 @@ export class SearchComponent {
       case 'people': return this.UserIcon;
       case 'groups': return this.UsersIcon;
       case 'courses': return this.BookIcon;
+      case 'posts': return this.BookIcon; // Use Book icon for posts for now
       case 'events': return this.CalendarIcon;
       default: return this.SearchIcon;
     }
   }
 
-  selectResult(result: any) {
-    console.log('Selected:', result);
-    // Navigate based on type
-    // this.router.navigate([`/dashboard/${result.type}/${result.id}`]);
+  selectResult(result: SearchResult) {
+    if (result.type === 'people') {
+      this.router.navigate([`/dashboard/profile/${result.id}`]);
+    } else if (result.type === 'posts') {
+      // For now, just scroll to feed or similar, or just log
+      console.log('Post selected:', result.id);
+    }
   }
 
   close() {

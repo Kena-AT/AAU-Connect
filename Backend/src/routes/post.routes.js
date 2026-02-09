@@ -3,7 +3,9 @@ const {
   getPosts,
   createPost,
   toggleLike,
-  toggleSave
+  toggleSave,
+  deletePost,
+  reportPost
 } = require('../controllers/post.controller');
 
 const router = express.Router();
@@ -16,7 +18,11 @@ router.route('/')
   .get(getPosts)
   .post(createPost);
 
+router.route('/:id')
+  .delete(deletePost);
+
 router.post('/:id/like', toggleLike);
 router.post('/:id/save', toggleSave);
+router.post('/:id/report', reportPost);
 
 module.exports = router;

@@ -1,7 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { LucideAngularModule, Home, Search, Compass, Film, Send, Heart, PlusSquare, Settings, Menu, User, Sun, Moon, PanelRight } from 'lucide-angular';
+import { LucideAngularModule, Home, Search, Compass, Film, Send, Heart, PlusSquare, Settings, Menu, User, Sun, Moon, PanelRight, Users, Calendar } from 'lucide-angular';
 import { UiStore } from '../../../../core/state/ui.store';
 
 @Component({
@@ -21,7 +21,7 @@ import { UiStore } from '../../../../core/state/ui.store';
             <lucide-icon [img]="HomeIcon" class="icon"></lucide-icon>
             <span class="nav-label">Home</span>
           </a>
-          <a class="nav-item">
+          <a routerLink="/dashboard/search" routerLinkActive="active" class="nav-item">
             <lucide-icon [img]="SearchIcon" class="icon"></lucide-icon>
             <span class="nav-label">Search</span>
           </a>
@@ -32,9 +32,13 @@ import { UiStore } from '../../../../core/state/ui.store';
             </div>
             <span class="nav-label">Messages</span>
           </a>
-          <a class="nav-item">
-            <lucide-icon [img]="HeartIcon" class="icon"></lucide-icon>
-            <span class="nav-label">Notifications</span>
+          <a routerLink="/dashboard/events" routerLinkActive="active" class="nav-item">
+            <lucide-icon [img]="CalendarIcon" class="icon"></lucide-icon>
+            <span class="nav-label">Events</span>
+          </a>
+          <a routerLink="/dashboard/groups" routerLinkActive="active" class="nav-item">
+            <lucide-icon [img]="UsersIcon" class="icon"></lucide-icon>
+            <span class="nav-label">Groups</span>
           </a>
           <a (click)="onCreatePost()" class="nav-item">
             <lucide-icon [img]="PlusIcon" class="icon"></lucide-icon>
@@ -258,6 +262,8 @@ export class SidebarComponent {
   readonly SunIcon = Sun;
   readonly MoonIcon = Moon;
   readonly PanelRightIcon = PanelRight;
+  readonly UsersIcon = Users;
+  readonly CalendarIcon = Calendar;
 
   onCreatePost() {
     this.ui.openCreatePostModal();
